@@ -204,3 +204,135 @@ class Database:
             self.connection.rollback()
             print(f"Student deletion error: {e}")
             raise
+    def get_students_by_course(self, course):
+        if not isinstance(course, str) or not course.strip():
+            raise ValueError("Course cannot be empty.")
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM students WHERE course = ?",
+                (course.strip(),)
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Course filtering error: {e}")
+            raise
+
+    def get_students_by_marks(self, min_marks):
+        if (
+            not isinstance(min_marks, (int, float))
+            or isinstance(min_marks, bool)
+            or not 0 <= min_marks <= 100
+        ):
+            raise ValueError("Invalid marks.")
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM students WHERE marks >= ?",
+                (min_marks,)
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Marks filtering error: {e}")
+            raise
+
+    def search_students_by_name(self, keyword):
+        if not isinstance(keyword, str) or not keyword.strip():
+            raise ValueError("Search keyword cannot be empty.")
+
+        try:
+            keyword = f"%{keyword.strip()}%"
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM students WHERE name LIKE ?",
+                (keyword,)
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Name search error: {e}")
+            raise
+
+    def get_students_sorted_by_marks(self, desc=True):
+        if not isinstance(desc, bool):
+            raise ValueError("Sort order must be True or False.")
+
+        order = "DESC" if desc else "ASC"
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                f"SELECT * FROM students ORDER BY marks {order}"
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Student sorting error: {e}")
+            raise
+
+    def get_top_students(self, limit):
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or limit <= 0
+        ):
+            raise ValueError("Number of students must be greater than 0.")
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "SELECT * FROM students ORDER BY marks DESC LIMIT ?",
+                (limit,)
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Top students retrieval error: {e}")
+            raise
+
+
+        
+    def get_students_by_course_and_marks(self, course, min_marks):
+        if not isinstance(course, str) or not course.strip():
+            raise ValueError("Course cannot be empty.")
+
+        if (
+            not isinstance(min_marks, (int, float))
+            or isinstance(min_marks, bool)
+            or not 0 <= min_marks <= 100
+        ):
+            raise ValueError("Invalid marks.")
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM students
+                WHERE course = ? AND marks >= ?
+                """,
+                (course.strip(), min_marks)
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Course and marks filtering error: {e}")
+            raise
+
+    def get_students_by_courses(self, course1, course2):
+        if (
+            not isinstance(course1, str) or not course1.strip()
+            or not isinstance(course2, str) or not course2.strip()
+        ):
+            raise ValueError("Course cannot be empty.")
+
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM students
+                WHERE course = ? OR course = ?
+                """,
+                (course1.strip(), course2.strip())
+            )
+            return cursor.fetchall()
+        except sqlite3.Error as e:
+            print(f"Multiple-course filtering error: {e}")
+            raise

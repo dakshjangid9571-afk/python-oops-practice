@@ -1,24 +1,28 @@
 
-# Task 3: Student CRUD Operations
+# Task 4: Student Filtering and Sorting
 
 ## Overview
-This project upgrades the Python-SQL Student Management System with Create, Read, Update, and Delete (CRUD) operations, student validation, safe SQL queries, and deletion confirmation.
+
+This project extends the Python-SQL Student Management System with student filtering, partial name searching, sorting, and Top N student retrieval. It retains all existing CRUD operations and uses parameterized SQL queries.
 
 ## Technologies Used
+
 - Python
 - SQLite
 - sqlite3
 - unittest
 
 ## Project Structure
-- `student.py` - Student class and input validation using `Student.validate()`
-- `database.py` - Database connection, table creation, and CRUD operations
+
+- `student.py` - Student class and input validation
+- `database.py` - Database connection, CRUD operations, filtering, and sorting
 - `main.py` - Menu-driven Student Management System
-- `test_student.py` - Automated tests for validation and database operations
+- `test_student.py` - Automated tests for validation, CRUD, filtering, and sorting
 - `student_management.db` - SQLite database file
 
 ## Database Design
-The `students` table contains the following columns:
+
+The `students` table contains these columns:
 
 | Column | Data Type | Constraint |
 |---|---|---|
@@ -29,31 +33,35 @@ The `students` table contains the following columns:
 | marks | REAL | NOT NULL, CHECK(marks >= 0 AND marks <= 100) |
 
 ## Features
-- Connects to an SQLite database.
-- Creates the students table with required constraints.
-- Validates student details using `Student.validate()`.
-- Adds students using INSERT.
-- Displays all students using SELECT.
-- Searches for students using SELECT and WHERE.
-- Updates student details using UPDATE and WHERE.
-- Keeps the student ID unchanged during updates.
-- Deletes students using DELETE and WHERE.
+
+- Adds, displays, searches, updates, and deletes students.
+- Searches students by course using `WHERE`.
+- Filters students by minimum marks using `WHERE` and `>=`.
+- Searches names partially using `LIKE`.
+- Combines course and marks conditions using `AND`.
+- Searches multiple courses using `OR`.
+- Sorts students by marks in ascending or descending order using `ORDER BY`.
+- Retrieves the Top N students using `ORDER BY marks DESC LIMIT`.
 - Uses parameterized SQL queries.
-- Uses `cursor.rowcount` to check affected records.
-- Displays student details and asks for confirmation before deletion.
-- Cancels deletion when the user does not confirm.
-- Handles duplicate IDs, invalid input, and missing students.
-- Closes the database connection when exiting.
+- Validates course, marks, and Top N input.
+- Preserves deletion confirmation and database connection handling.
 
 ## Menu Options
+
 1. Add Student
 2. View All Students
-3. Search Student
-4. Update Student
-5. Delete Student
-6. Exit
+3. Search Student by ID
+4. Search Student by Course
+5. Search Student by Name
+6. Filter Students by Marks
+7. Sort Students by Marks
+8. Top N Students
+9. Update Student
+10. Delete Student
+11. Exit
 
 ## How to Run
+
 Run these commands from the repository root.
 
 Start the application:
@@ -62,33 +70,33 @@ Start the application:
 python "src/Day 10-SQL/main.py"
 ```
 
-Run the automated tests:
+Run automated tests:
 
 ```powershell
-python "src/Day 10-SQL/test_student.py"
+python -m unittest discover -s "src/Day 10-SQL" -p "test_student.py" -v
 ```
 
 ## Testing
-The automated test suite checks these 13 cases:
 
-1. Valid student insertion
-2. Duplicate student ID
-3. Invalid age
-4. Invalid marks
-5. Empty student name
-6. Empty course
-7. Search for an existing student
-8. Search for a non-existing student
-9. Update student marks successfully
-10. Reject invalid marks during update without changing the database
-11. Delete an existing student
-12. Handle deletion of a missing student
-13. Cancel deletion and preserve the record
+The automated test suite contains 23 tests covering:
 
-All 13 automated tests passed during verification.
+- Student validation and duplicate IDs
+- Student search, update, and deletion
+- Deletion cancellation
+- Course filtering
+- Minimum marks filtering
+- Partial name search
+- Ascending and descending marks sorting
+- Top N students
+- Invalid marks and Top N input
+- Combined course and marks filtering with `AND`
+- Multiple-course filtering with `OR`
+
+**Latest verification:** All 23 tests passed.
 
 ## Sample Student Records
-The test suite uses these sample records in a temporary database:
+
+The tests use these records in a temporary database:
 
 - Rahul - 20 - BCA - 82
 - Priya - 21 - BCA - 88
@@ -96,11 +104,23 @@ The test suite uses these sample records in a temporary database:
 - Neha - 22 - BCA - 91
 - Rohit - 21 - BBA - 69
 
+## SQL Concepts Used
+
+- `WHERE` - Filters records based on a condition.
+- `AND` - Requires both conditions to be true.
+- `OR` - Requires at least one condition to be true.
+- `LIKE` - Searches for a matching name pattern.
+- `ORDER BY` - Sorts query results.
+- `ASC` - Sorts in ascending order.
+- `DESC` - Sorts in descending order.
+- `LIMIT` - Restricts the number of returned records.
+
 ## Learning Outcomes
-- Performing CRUD operations using Python and SQLite.
-- Applying SQL constraints and parameterized queries.
-- Using SELECT, WHERE, UPDATE, and DELETE.
-- Validating student details during insertion and updating.
-- Using `cursor.rowcount` to identify affected records.
-- Implementing deletion confirmation.
-- Testing database operations with unittest.
+
+- Performing CRUD operations with Python and SQLite.
+- Filtering and searching student records.
+- Combining conditions using `AND` and `OR`.
+- Sorting query results using `ORDER BY`.
+- Retrieving a limited number of records using `LIMIT`.
+- Writing parameterized SQL queries.
+- Testing database operations using `unittest`.

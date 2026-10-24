@@ -102,6 +102,65 @@ class TestStudentDatabase(unittest.TestCase):
 
         self.assertIsNotNone(self.db.get_student_by_id(3))
 
+    def test_filter_students_by_course(self):
+        students = self.db.get_students_by_course("BCA")
+        self.assertEqual(len(students), 3)
+        self.assertTrue(all(student[3] == "BCA" for student in students))
+
+    def test_filter_students_by_minimum_marks(self):
+        students = self.db.get_students_by_marks(80)
+        self.assertTrue(all(student[4] >= 80 for student in students))
+        self.assertEqual(len(students), 3)
+
+    def test_search_students_by_partial_name(self):
+        students = self.db.search_students_by_name("ri")
+        names = [student[1] for student in students]
+        self.assertIn("Priya", names)
+        self.assertEqual(names, ["Priya"])
+
+    def test_sort_students_by_marks_descending(self):
+        students = self.db.get_students_sorted_by_marks(desc=True)
+        marks = [student[4] for student in students]
+        self.assertEqual(marks, sorted(marks, reverse=True))
+
+    def test_sort_students_by_marks_ascending(self):
+        students = self.db.get_students_sorted_by_marks(desc=False)
+        marks = [student[4] for student in students]
+        self.assertEqual(marks, sorted(marks))
+
+    def test_get_top_three_students(self):
+        students = self.db.get_top_students(3)
+        self.assertEqual(len(students), 3)
+        marks = [student[4] for student in students]
+        self.assertEqual(marks, sorted(marks, reverse=True))
+
+    def test_invalid_minimum_marks(self):
+        with self.assertRaisesRegex(ValueError, "Invalid marks"):
+            self.db.get_students_by_marks(150)
+
+    def test_invalid_top_n(self):
+        with self.assertRaisesRegex(
+            ValueError, "Number of students must be greater than 0"
+        ):
+            self.db.get_top_students(-5)
+
+
+    def test_filter_students_by_course_and_marks(self):
+        students = self.db.get_students_by_course_and_marks("BCA", 80)
+
+        self.assertEqual(len(students), 3)
+        self.assertTrue(
+            all(student[3] == "BCA" and student[4] >= 80
+                for student in students)
+        )
+
+    def test_filter_students_by_either_course(self):
+        students = self.db.get_students_by_courses("BCA", "BBA")
+
+        self.assertEqual(len(students), 5)
+        self.assertTrue(
+            all(student[3] in ("BCA", "BBA") for student in students)
+        )
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
