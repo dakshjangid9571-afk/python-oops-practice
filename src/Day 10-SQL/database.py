@@ -1,7 +1,7 @@
 
 import sqlite3
 import os
-
+from student import Student
 
 class Database:
     def __init__(self, db_name="student_management.db"):
@@ -144,4 +144,63 @@ class Database:
             return cursor.fetchone()
         except sqlite3.Error as e:
             print(f"Student search error: {e}")
+            raise
+
+        
+    def update_student(self, student_id, name, age, course, marks):
+        try:
+            student = Student(student_id, name, age, course, marks)
+
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE students
+                SET name = ?, age = ?, course = ?, marks = ?
+                WHERE student_id = ?
+            """, (
+                student.name,
+                student.age,
+                student.course,
+                student.marks,
+                student_id
+            ))
+
+            self.connection.commit()
+
+            if cursor.rowcount == 1:
+                print("Student updated successfully.")
+            else:
+                print("Student not found.")
+
+            return cursor.rowcount
+
+        except sqlite3.IntegrityError as e:
+            self.connection.rollback()
+            print(f"Student update failed: {e}")
+            return 0
+
+        except sqlite3.Error as e:
+            self.connection.rollback()
+            print(f"Student update error: {e}")
+            raise
+
+    def delete_student(self, student_id):
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                "DELETE FROM students WHERE student_id = ?",
+                (student_id,)
+            )
+
+            self.connection.commit()
+
+            if cursor.rowcount == 1:
+                print("Student deleted successfully.")
+            else:
+                print("Student not found.")
+
+            return cursor.rowcount
+
+        except sqlite3.Error as e:
+            self.connection.rollback()
+            print(f"Student deletion error: {e}")
             raise

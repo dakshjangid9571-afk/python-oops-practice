@@ -1,8 +1,8 @@
 
-# Task 2: Robust Student Database with Constraints
+# Task 3: Student CRUD Operations
 
 ## Overview
-This project upgrades the Python–SQL Student Management System with database constraints, duplicate ID handling, student search, and validation testing.
+This project upgrades the Python-SQL Student Management System with Create, Read, Update, and Delete (CRUD) operations, student validation, safe SQL queries, and deletion confirmation.
 
 ## Technologies Used
 - Python
@@ -11,10 +11,10 @@ This project upgrades the Python–SQL Student Management System with database c
 - unittest
 
 ## Project Structure
-- `student.py` - Student class and input validation
-- `database.py` - Database connection, table creation, insertion, and retrieval
-- `main.py` - Main application
-- `test_student.py` - Automated tests for student validation and database operations
+- `student.py` - Student class and input validation using `Student.validate()`
+- `database.py` - Database connection, table creation, and CRUD operations
+- `main.py` - Menu-driven Student Management System
+- `test_student.py` - Automated tests for validation and database operations
 - `student_management.db` - SQLite database file
 
 ## Database Design
@@ -31,16 +31,32 @@ The `students` table contains the following columns:
 ## Features
 - Connects to an SQLite database.
 - Creates the students table with required constraints.
-- Validates student details using the Student class.
-- Prevents duplicate student IDs.
-- Displays a friendly message when a duplicate ID is entered.
-- Retrieves all student records using SELECT.
-- Searches for a student using their ID and WHERE.
-- Handles searches for students who do not exist.
-- Closes the database connection.
+- Validates student details using `Student.validate()`.
+- Adds students using INSERT.
+- Displays all students using SELECT.
+- Searches for students using SELECT and WHERE.
+- Updates student details using UPDATE and WHERE.
+- Keeps the student ID unchanged during updates.
+- Deletes students using DELETE and WHERE.
+- Uses parameterized SQL queries.
+- Uses `cursor.rowcount` to check affected records.
+- Displays student details and asks for confirmation before deletion.
+- Cancels deletion when the user does not confirm.
+- Handles duplicate IDs, invalid input, and missing students.
+- Closes the database connection when exiting.
+
+## Menu Options
+1. Add Student
+2. View All Students
+3. Search Student
+4. Update Student
+5. Delete Student
+6. Exit
 
 ## How to Run
-Run these commands from the repository root:
+Run these commands from the repository root.
+
+Start the application:
 
 ```powershell
 python "src/Day 10-SQL/main.py"
@@ -53,7 +69,7 @@ python "src/Day 10-SQL/test_student.py"
 ```
 
 ## Testing
-The automated test suite checks these eight cases:
+The automated test suite checks these 13 cases:
 
 1. Valid student insertion
 2. Duplicate student ID
@@ -63,10 +79,17 @@ The automated test suite checks these eight cases:
 6. Empty course
 7. Search for an existing student
 8. Search for a non-existing student
+9. Update student marks successfully
+10. Reject invalid marks during update without changing the database
+11. Delete an existing student
+12. Handle deletion of a missing student
+13. Cancel deletion and preserve the record
 
-All 8 automated tests passed during verification.
+All 13 automated tests passed during verification.
 
 ## Sample Student Records
+The test suite uses these sample records in a temporary database:
+
 - Rahul - 20 - BCA - 82
 - Priya - 21 - BCA - 88
 - Amit - 20 - BBA - 76
@@ -74,7 +97,10 @@ All 8 automated tests passed during verification.
 - Rohit - 21 - BBA - 69
 
 ## Learning Outcomes
-- Applying SQL constraints in SQLite.
-- Handling duplicate primary keys.
-- Using SELECT and WHERE queries.
-- Testing validation and database functionality with unittest.
+- Performing CRUD operations using Python and SQLite.
+- Applying SQL constraints and parameterized queries.
+- Using SELECT, WHERE, UPDATE, and DELETE.
+- Validating student details during insertion and updating.
+- Using `cursor.rowcount` to identify affected records.
+- Implementing deletion confirmation.
+- Testing database operations with unittest.
