@@ -42,6 +42,57 @@ def delete_student_with_confirmation(db, student_id):
         print("Deletion cancelled.")
 
 
+def display_student_statistics(db):
+    total_students = db.get_total_students()
+
+    if total_students == 0:
+        print("No student records available.")
+        return
+
+    print("\n===== Student Statistics =====")
+    print(f"Total Students: {total_students}")
+    print(f"Total Marks: {db.get_total_marks()}")
+    print(f"Average Marks: {db.get_average_marks():.2f}")
+    print(f"Highest Marks: {db.get_highest_marks()}")
+    print(f"Lowest Marks: {db.get_lowest_marks()}")
+
+
+def display_course_statistics(db):
+    statistics = db.get_course_statistics()
+
+    if not statistics:
+        print("No course records available.")
+        return
+
+    print("\n===== Course-wise Statistics =====")
+    print(f"{'Course':<15}{'Students':<12}{'Average':<12}{'Highest':<12}{'Lowest':<12}")
+    print("-" * 63)
+
+    for course, total, average, highest, lowest in statistics:
+        print(
+            f"{course:<15}{total:<12}"
+            f"{average:.2f}{'':<10}"
+            f"{highest:<12}{lowest:<12}"
+        )
+
+    try:
+        min_average = float(
+            input("\nEnter minimum average marks to filter courses (0-100): ")
+        )
+        qualifying_courses = db.get_courses_above_average(min_average)
+
+        print(f"\nCourses with average marks >= {min_average}:")
+        if not qualifying_courses:
+            print("No courses meet this average.")
+        else:
+            for course, average in qualifying_courses:
+                print(f"{course}: {average:.2f}")
+
+    except ValueError as e:
+        print(f"Validation/Input error: {e}")
+
+
+
 def main():
     db = Database()
 
@@ -51,6 +102,7 @@ def main():
 
         while True:
             print("\n===== Student Management System =====")
+            
             print("1. Add Student")
             print("2. View All Students")
             print("3. Search Student by ID")
@@ -61,9 +113,12 @@ def main():
             print("8. Top N Students")
             print("9. Update Student")
             print("10. Delete Student")
-            print("11. Exit")
+            print("11. Student Statistics")
+            print("12. Course-wise Statistics")
+            print("13. Exit")
 
-            choice = input("Enter your choice (1-11): ").strip()
+            choice = input("Enter your choice (1-13): ").strip()
+
 
             if choice == "1":
                 try:
@@ -182,12 +237,19 @@ def main():
                 except ValueError:
                     print("Student ID must be an integer.")
 
+            
             elif choice == "11":
+                display_student_statistics(db)
+
+            elif choice == "12":
+                display_course_statistics(db)
+
+            elif choice == "13":
                 print("Exiting Student Management System.")
                 break
 
             else:
-                print("Invalid choice. Please enter a number from 1 to 11.")
+                print("Invalid choice. Please enter a number from 1 to 13.")
 
     except Exception as e:
         print(f"Application error: {e}")

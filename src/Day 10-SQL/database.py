@@ -219,6 +219,88 @@ class Database:
             print(f"Course filtering error: {e}")
             raise
 
+
+    def get_total_students(self):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT COUNT(*) FROM students")
+        return cursor.fetchone()[0]
+
+    def get_average_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT AVG(marks) FROM students")
+        return cursor.fetchone()[0]
+
+    def get_total_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT SUM(marks) FROM students")
+        return cursor.fetchone()[0]
+
+    def get_highest_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT MAX(marks) FROM students")
+        return cursor.fetchone()[0]
+
+    def get_lowest_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT MIN(marks) FROM students")
+        return cursor.fetchone()[0]
+
+    def get_course_statistics(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course, COUNT(*) AS total_students,
+                   AVG(marks) AS average_marks,
+                   MAX(marks) AS highest_marks,
+                   MIN(marks) AS lowest_marks
+            FROM students
+            GROUP BY course
+        """)
+        return cursor.fetchall()
+
+    def get_course_average_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course, AVG(marks) AS average_marks
+            FROM students
+            GROUP BY course
+        """)
+        return cursor.fetchall()
+
+    def get_course_highest_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course, MAX(marks) AS highest_marks
+            FROM students
+            GROUP BY course
+        """)
+        return cursor.fetchall()
+
+    def get_course_lowest_marks(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course, MIN(marks) AS lowest_marks
+            FROM students
+            GROUP BY course
+        """)
+        return cursor.fetchall()
+
+    def get_courses_above_average(self, min_average):
+        if (
+            not isinstance(min_average, (int, float))
+            or isinstance(min_average, bool)
+            or not 0 <= min_average <= 100
+        ):
+            raise ValueError("Invalid average marks.")
+
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course, AVG(marks) AS average_marks
+            FROM students
+            GROUP BY course
+            HAVING AVG(marks) >= ?
+        """, (min_average,))
+        return cursor.fetchall()
+
     def get_students_by_marks(self, min_marks):
         if (
             not isinstance(min_marks, (int, float))

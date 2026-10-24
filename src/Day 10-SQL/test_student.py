@@ -162,5 +162,82 @@ class TestStudentDatabase(unittest.TestCase):
             all(student[3] in ("BCA", "BBA") for student in students)
         )
 
+
+    def test_total_students(self):
+        self.assertEqual(self.db.get_total_students(), 5)
+
+    def test_average_marks(self):
+        self.assertAlmostEqual(self.db.get_average_marks(), 81.2)
+
+    def test_total_marks(self):
+        self.assertEqual(self.db.get_total_marks(), 406)
+
+    def test_highest_marks(self):
+        self.assertEqual(self.db.get_highest_marks(), 91)
+
+    def test_lowest_marks(self):
+        self.assertEqual(self.db.get_lowest_marks(), 69)
+
+    def test_course_statistics(self):
+        statistics = {
+            row[0]: row[1:]
+            for row in self.db.get_course_statistics()
+        }
+
+        self.assertEqual(statistics["BCA"][0], 3)
+        self.assertAlmostEqual(statistics["BCA"][1], 87.0)
+        self.assertEqual(statistics["BCA"][2:], (91.0, 82.0))
+
+        self.assertEqual(statistics["BBA"][0], 2)
+        self.assertAlmostEqual(statistics["BBA"][1], 72.5)
+        self.assertEqual(statistics["BBA"][2:], (76.0, 69.0))
+
+    def test_course_average_marks(self):
+        averages = dict(self.db.get_course_average_marks())
+
+        self.assertAlmostEqual(averages["BCA"], 87.0)
+        self.assertAlmostEqual(averages["BBA"], 72.5)
+
+    def test_course_highest_marks(self):
+        highest = dict(self.db.get_course_highest_marks())
+
+        self.assertEqual(highest["BCA"], 91.0)
+        self.assertEqual(highest["BBA"], 76.0)
+
+    def test_course_lowest_marks(self):
+        lowest = dict(self.db.get_course_lowest_marks())
+
+        self.assertEqual(lowest["BCA"], 82.0)
+        self.assertEqual(lowest["BBA"], 69.0)
+
+    def test_courses_above_average(self):
+        courses = self.db.get_courses_above_average(80)
+
+        self.assertEqual(len(courses), 1)
+        self.assertEqual(courses[0][0], "BCA")
+        self.assertAlmostEqual(courses[0][1], 87.0)
+
+    def test_invalid_minimum_average(self):
+        with self.assertRaisesRegex(ValueError, "Invalid average marks"):
+            self.db.get_courses_above_average(150)
+
+
+    def test_empty_database_analytics(self):
+        cursor = self.db.connection.cursor()
+        cursor.execute("DELETE FROM students")
+        self.db.connection.commit()
+
+        self.assertEqual(self.db.get_total_students(), 0)
+        self.assertIsNone(self.db.get_average_marks())
+        self.assertIsNone(self.db.get_total_marks())
+        self.assertIsNone(self.db.get_highest_marks())
+        self.assertIsNone(self.db.get_lowest_marks())
+        self.assertEqual(self.db.get_course_statistics(), [])
+        self.assertEqual(self.db.get_course_average_marks(), [])
+        self.assertEqual(self.db.get_course_highest_marks(), [])
+        self.assertEqual(self.db.get_course_lowest_marks(), [])
+        self.assertEqual(self.db.get_courses_above_average(80), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
