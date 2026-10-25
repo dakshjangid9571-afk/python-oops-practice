@@ -116,8 +116,7 @@ def main():
 
     try:
         db.connect()
-        db.create_table()
-        db.create_history_table()
+        db.create_tables()
 
         while True:
             print("\n===== Student Management System =====")
@@ -304,3 +303,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

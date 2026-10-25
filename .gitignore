@@ -2,3 +2,14 @@
 __pycache__/
 *.py[cod]
 *.db
+
+# Environment variables and secrets
+.env
+.env.*
+
+# Keep the example configuration file in Git
+!.env.example
+
+# Virtual environments
+.venv/
+venv/
