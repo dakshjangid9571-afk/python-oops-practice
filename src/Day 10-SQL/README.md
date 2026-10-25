@@ -1,10 +1,12 @@
-# Task 6: Student Database Relationships & JOINs
+# Task 7: Database Transactions & ACID
 
 ## Overview
 
-This project extends the Python-SQL Student Management System by introducing relational database design, course management, foreign keys, and SQL JOIN operations. It retains the previous student CRUD operations, searching, filtering, sorting, Top N retrieval, and performance analytics.
+This project extends the Python-SQL Student Management System with database transactions and transaction history tracking. It retains the previous student CRUD operations, course management, searching, filtering, sorting, JOIN operations, and performance analytics.
 
-The system manages courses separately from students and connects them using `course_id`. SQL INNER JOIN displays students with their course names, while LEFT JOIN provides course-wise statistics, including courses without students.
+The system supports transferring a student from one course to another using database transactions. Each successful transfer updates the student's course and records the transfer in the `student_course_history` table.
+
+Transactions help maintain data consistency. If any part of a transfer fails, the transaction is rolled back so that incomplete changes are not saved.
 
 ## Technologies Used
 
@@ -12,14 +14,15 @@ The system manages courses separately from students and connects them using `cou
 - SQLite
 - sqlite3
 - unittest
+- SQL Transactions
 
 ## Project Structure
 
 - `student.py` - Student class and validation
 - `course.py` - Course class and validation
-- `database.py` - Database connection, course/student CRUD, JOINs, and analytics
+- `database.py` - Database connection, student/course operations, JOINs, analytics, transactions, and transfer history
 - `main.py` - Menu-driven Student Management System
-- `test_student.py` - Automated tests for validation, CRUD, JOINs, and analytics
+- `test_student.py` - Automated tests for validation, CRUD, JOINs, analytics, and transactions
 - `student_management.db` - SQLite database file
 
 ## Database Design
@@ -40,6 +43,10 @@ The system manages courses separately from students and connects them using `cou
 | age | INTEGER | NOT NULL, CHECK(age > 0) |
 | course_id | INTEGER | NOT NULL, FOREIGN KEY references courses(course_id) |
 | marks | REAL | NOT NULL, CHECK(marks >= 0 AND marks <= 100) |
+
+### Student Course History
+
+The `student_course_history` table records successful student course transfers. It maintains a history of course changes for tracking and verification.
 
 ## Sample Courses
 
@@ -65,9 +72,14 @@ The system manages courses separately from students and connects them using `cou
 - Retrieves the Top N students.
 - Calculates total students, total marks, average marks, highest marks, and lowest marks.
 - Calculates course-wise student counts and marks statistics.
-- Uses SQL aggregate functions, GROUP BY, HAVING, and parameterized queries.
-- Handles invalid input and empty analytics results.
-- Preserves deletion confirmation and database connection handling.
+- Transfers a student from one course to another.
+- Records successful course transfers in `student_course_history`.
+- Uses database transactions to maintain consistent data.
+- Commits a transfer only after the required operations succeed.
+- Rolls back changes if a transfer operation fails.
+- Retrieves course transfer history.
+- Supports viewing transfer history for a particular student.
+- Uses parameterized SQL queries and handles database errors.
 
 ## Menu Options
 
@@ -85,7 +97,9 @@ The system manages courses separately from students and connects them using `cou
 12. Student Statistics
 13. Course-wise Statistics
 14. Courses Without Students
-15. Exit
+15. Transfer Student Course
+16. View Course Transfer History
+17. Exit
 
 ## Required Database Methods
 
@@ -103,24 +117,52 @@ The system manages courses separately from students and connects them using `cou
 - `get_course_statistics()` - Returns course-wise student counts and marks statistics, including courses with no students.
 - `get_courses_without_students()` - Returns courses without enrolled students.
 
+### Transaction and History Methods
+
+- `create_history_table()` - Creates the student course history table.
+- `begin_transaction()` - Begins a database transaction.
+- `commit()` - Commits a successful transaction.
+- `rollback()` - Rolls back a failed transaction.
+- `transfer_student_course()` - Transfers a student to another course within a transaction.
+- `get_course_history()` - Retrieves course transfer history.
+- `get_student_course_history()` - Retrieves transfer history for a particular student.
+
+## Database Transactions and ACID
+
+### Atomicity
+
+A course transfer is treated as a single unit of work. If an operation fails, the transaction is rolled back instead of saving only part of the transfer.
+
+### Consistency
+
+Student and course relationships must remain valid. A transfer must use a valid student and destination course.
+
+### Isolation
+
+Database transactions provide a mechanism for controlling how changes are handled while a transaction is in progress.
+
+### Durability
+
+Once a transaction is successfully committed, its changes are saved to the database.
+
 ## How to Run
 
 Run these commands from the repository root.
 
-Start the application:
+### Start the Application
 
 ```powershell
 python "src/Day 10-SQL/main.py"
 ```
 
-Run automated tests:
+### Run Automated Tests
 
 ```powershell
 $env:PYTHONPATH = "src\Day 10-SQL"
-python -m unittest discover -s "src\Day 10-SQL" -p "test_student.py" -v
+python -m unittest discover -s "src/Day 10-SQL" -p "test_student.py" -v
 ```
 
-Check Python syntax:
+### Check Python Syntax
 
 ```powershell
 python -m py_compile "src/Day 10-SQL/main.py" "src/Day 10-SQL/database.py" "src/Day 10-SQL/student.py" "src/Day 10-SQL/course.py" "src/Day 10-SQL/test_student.py"
@@ -128,7 +170,7 @@ python -m py_compile "src/Day 10-SQL/main.py" "src/Day 10-SQL/database.py" "src/
 
 ## Testing
 
-The automated test suite contains 46 tests covering:
+The automated test suite contains **51 tests** covering:
 
 - Course validation and course CRUD operations
 - Student validation and student CRUD operations
@@ -141,8 +183,13 @@ The automated test suite contains 46 tests covering:
 - Courses without students
 - Course-wise average, highest, and lowest marks
 - Empty database analytics
+- Successful student course transfers
+- Handling invalid student IDs during transfers
+- Handling invalid destination courses
+- Rejecting transfers to the same course
+- Transaction rollback when recording transfer history fails
 
-**Latest verification:** All 46 tests passed.
+**Latest verification:** All 51 tests passed.
 
 ## Sample Student Records
 
@@ -168,6 +215,10 @@ The automated test suite contains 46 tests covering:
 - `COUNT()`, `SUM()`, `AVG()`, `MAX()`, `MIN()` - Perform aggregate calculations.
 - `ORDER BY` - Sorts results.
 - `LIMIT` - Restricts the number of returned records.
+- `BEGIN` - Starts a transaction.
+- `COMMIT` - Saves transaction changes.
+- `ROLLBACK` - Reverts uncommitted transaction changes.
+- ACID properties - Describe the reliability principles of database transactions.
 
 ## Learning Outcomes
 
@@ -177,4 +228,7 @@ The automated test suite contains 46 tests covering:
 - Retrieving related records using INNER JOIN and LEFT JOIN.
 - Calculating course-wise statistics.
 - Identifying courses without students.
+- Implementing database transactions.
+- Maintaining data consistency through commit and rollback.
+- Recording and retrieving student course transfer history.
 - Testing database functionality using `unittest`.

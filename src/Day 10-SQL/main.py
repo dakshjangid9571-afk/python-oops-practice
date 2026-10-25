@@ -117,6 +117,7 @@ def main():
     try:
         db.connect()
         db.create_table()
+        db.create_history_table()
 
         while True:
             print("\n===== Student Management System =====")
@@ -134,9 +135,11 @@ def main():
             print("12. Student Statistics")
             print("13. Course-wise Statistics")
             print("14. Courses Without Students")
-            print("15. Exit")
+            print("15. Transfer Student Course")
+            print("16. View Course Transfer History")
+            print("17. Exit")
 
-            choice = input("Enter your choice (1-15): ").strip()
+            choice = input("Enter your choice (1-17): ").strip()
 
             if choice == "1":
                 try:
@@ -256,12 +259,41 @@ def main():
                 print("\n===== Courses Without Students =====")
                 display_courses(db.get_courses_without_students())
 
+
             elif choice == "15":
+                try:
+                    student_id = int(input("Enter Student ID to transfer: "))
+                    new_course_id = int(input("Enter new Course ID: "))
+                    db.transfer_student_course(student_id, new_course_id)
+                except ValueError as e:
+                    print(f"Transfer failed: {e}")
+                except Exception as e:
+                    print(f"Database error: {e}")
+
+            elif choice == "16":
+                print("\n===== Student Course Transfer History =====")
+                history = db.get_course_history()
+
+                if not history:
+                    print("No course transfer history found.")
+                else:
+                    for record in history:
+                        print(
+                            f"History ID: {record[0]}, "
+                            f"Student ID: {record[1]}, "
+                            f"Name: {record[2]}, "
+                            f"Old Course: {record[4]}, "
+                            f"New Course: {record[6]}, "
+                            f"Changed At: {record[7]}"
+                        )
+
+            elif choice == "17":
                 print("Exiting Student Management System.")
                 break
 
             else:
-                print("Invalid choice. Please enter a number from 1 to 15.")
+                print("Invalid choice. Please enter a number from 1 to 17.")
+
 
     except Exception as e:
         print(f"Application error: {e}")

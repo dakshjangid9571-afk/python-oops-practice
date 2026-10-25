@@ -294,6 +294,81 @@ class TestStudentDatabase(unittest.TestCase):
             [(1, "BCA"), (2, "BBA"), (3, "MCA"), (4, "MBA")]
         )
 
+class TestStudentCourseTransactions(unittest.TestCase):
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        db_path = os.path.join(self.temp_dir.name, "transaction_test.db")
+
+        self.db = Database(db_name=db_path)
+        self.db.connect()
+        self.db.create_table()
+        self.db.create_history_table()
+
+        self.db.add_course(Course(1, "BCA"))
+        self.db.add_course(Course(2, "MCA"))
+        self.db.add_student(Student(1, "Rahul", 20, 1, 82))
+
+    def tearDown(self):
+        self.db.close()
+        self.temp_dir.cleanup()
+
+    def test_successful_course_transfer(self):
+        result = self.db.transfer_student_course(1, 2)
+
+        student = self.db.get_student_by_id(1)
+        history = self.db.get_student_course_history(1)
+
+        self.assertTrue(result)
+        self.assertEqual(student[3], 2)
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0][2], 1)
+        self.assertEqual(history[0][4], 2)
+
+    def test_invalid_student_rolls_back(self):
+        with self.assertRaisesRegex(ValueError, "Student not found"):
+            self.db.transfer_student_course(999, 2)
+
+        self.assertEqual(self.db.get_student_by_id(1)[3], 1)
+        self.assertEqual(self.db.get_student_course_history(1), [])
+
+    def test_invalid_course_rolls_back(self):
+        with self.assertRaisesRegex(ValueError, "New course not found"):
+            self.db.transfer_student_course(1, 99)
+
+        self.assertEqual(self.db.get_student_by_id(1)[3], 1)
+        self.assertEqual(self.db.get_student_course_history(1), [])
+
+    def test_same_course_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError, "already enrolled in this course"
+        ):
+            self.db.transfer_student_course(1, 1)
+
+        self.assertEqual(self.db.get_student_by_id(1)[3], 1)
+        self.assertEqual(self.db.get_student_course_history(1), [])
+
+    def test_history_insert_failure_rolls_back_transfer(self):
+        self.db.connection.execute("""
+            CREATE TRIGGER fail_history_insert
+            BEFORE INSERT ON student_course_history
+            BEGIN
+                SELECT RAISE(ABORT, 'Simulated history insert failure');
+            END
+        """)
+        self.db.connection.commit()
+
+        with self.assertRaisesRegex(
+            Exception, "Simulated history insert failure"
+        ):
+            self.db.transfer_student_course(1, 2)
+
+        student = self.db.get_student_by_id(1)
+        history = self.db.get_student_course_history(1)
+
+        self.assertEqual(student[3], 1)
+        self.assertEqual(history, [])
+
 
 if __name__ == "__main__":
     unittest.main()

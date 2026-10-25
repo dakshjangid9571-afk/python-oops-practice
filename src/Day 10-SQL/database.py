@@ -484,3 +484,129 @@ class Database:
         """, (min_average,))
         return cursor.fetchall()
 
+
+    def create_history_table(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS student_course_history (
+                history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                old_course_id INTEGER NOT NULL,
+                new_course_id INTEGER NOT NULL,
+                changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id)
+                    REFERENCES students(student_id),
+                FOREIGN KEY (old_course_id)
+                    REFERENCES courses(course_id),
+                FOREIGN KEY (new_course_id)
+                    REFERENCES courses(course_id)
+            )
+        """)
+        self.connection.commit()
+        print("Student course history table created successfully.")
+
+    def begin_transaction(self):
+        if self.connection.in_transaction:
+            raise RuntimeError("A transaction is already active.")
+        self.connection.execute("BEGIN")
+
+    def commit(self):
+        self.connection.commit()
+        print("Transaction committed successfully.")
+
+    def rollback(self):
+        self.connection.rollback()
+        print("Transaction rolled back successfully.")
+
+    def transfer_student_course(self, student_id, new_course_id):
+        cursor = self.connection.cursor()
+
+        try:
+            self.begin_transaction()
+
+            cursor.execute(
+                "SELECT course_id FROM students WHERE student_id = ?",
+                (student_id,)
+            )
+            student = cursor.fetchone()
+
+            if student is None:
+                raise ValueError("Student not found.")
+
+            old_course_id = student[0]
+
+            cursor.execute(
+                "SELECT course_id FROM courses WHERE course_id = ?",
+                (new_course_id,)
+            )
+            course = cursor.fetchone()
+
+            if course is None:
+                raise ValueError("New course not found.")
+
+            if old_course_id == new_course_id:
+                raise ValueError("Student is already enrolled in this course.")
+
+            cursor.execute(
+                "UPDATE students SET course_id = ? WHERE student_id = ?",
+                (new_course_id, student_id)
+            )
+
+            cursor.execute("""
+                INSERT INTO student_course_history
+                    (student_id, old_course_id, new_course_id)
+                VALUES (?, ?, ?)
+            """, (student_id, old_course_id, new_course_id))
+
+            self.commit()
+            print("Student course transferred successfully.")
+            return True
+
+        except Exception:
+            self.rollback()
+            raise
+
+
+    def get_course_history(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT
+                h.history_id,
+                h.student_id,
+                s.name,
+                h.old_course_id,
+                old_c.course_name,
+                h.new_course_id,
+                new_c.course_name,
+                h.changed_at
+            FROM student_course_history AS h
+            JOIN students AS s
+                ON h.student_id = s.student_id
+            JOIN courses AS old_c
+                ON h.old_course_id = old_c.course_id
+            JOIN courses AS new_c
+                ON h.new_course_id = new_c.course_id
+            ORDER BY h.history_id
+        """)
+        return cursor.fetchall()
+
+    def get_student_course_history(self, student_id):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT
+                h.history_id,
+                h.student_id,
+                h.old_course_id,
+                old_c.course_name,
+                h.new_course_id,
+                new_c.course_name,
+                h.changed_at
+            FROM student_course_history AS h
+            JOIN courses AS old_c
+                ON h.old_course_id = old_c.course_id
+            JOIN courses AS new_c
+                ON h.new_course_id = new_c.course_id
+            WHERE h.student_id = ?
+            ORDER BY h.history_id
+        """, (student_id,))
+        return cursor.fetchall()
