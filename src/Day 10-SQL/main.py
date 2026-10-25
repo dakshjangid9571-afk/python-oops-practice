@@ -1,6 +1,18 @@
 
 from database import Database
 from student import Student
+from course import Course
+
+
+def display_courses(courses):
+    if not courses:
+        print("No courses found.")
+        return
+
+    print(f"{'Course ID':<12}{'Course Name':<15}")
+    print("-" * 27)
+    for course_id, course_name in courses:
+        print(f"{course_id:<12}{course_name:<15}")
 
 
 def display_student(student):
@@ -10,7 +22,7 @@ def display_student(student):
 
     print(
         f"ID: {student[0]}, Name: {student[1]}, "
-        f"Age: {student[2]}, Course: {student[3]}, "
+        f"Age: {student[2]}, Course ID: {student[3]}, "
         f"Marks: {student[4]}"
     )
 
@@ -22,6 +34,24 @@ def display_students(students):
 
     for student in students:
         display_student(student)
+
+
+def display_students_with_courses(students):
+    if not students:
+        print("No students found.")
+        return
+
+    print(
+        f"{'ID':<8}{'Name':<15}{'Age':<8}"
+        f"{'Course ID':<12}{'Course Name':<15}{'Marks':<8}"
+    )
+    print("-" * 66)
+
+    for student_id, name, age, course_id, course_name, marks in students:
+        print(
+            f"{student_id:<8}{name:<15}{age:<8}"
+            f"{course_id:<12}{course_name:<15}{marks:<8.2f}"
+        )
 
 
 def delete_student_with_confirmation(db, student_id):
@@ -43,18 +73,18 @@ def delete_student_with_confirmation(db, student_id):
 
 
 def display_student_statistics(db):
-    total_students = db.get_total_students()
+    total = db.get_total_students()
 
-    if total_students == 0:
+    if total == 0:
         print("No student records available.")
         return
 
     print("\n===== Student Statistics =====")
-    print(f"Total Students: {total_students}")
-    print(f"Total Marks: {db.get_total_marks()}")
+    print(f"Total Students: {total}")
+    print(f"Total Marks: {db.get_total_marks():.2f}")
     print(f"Average Marks: {db.get_average_marks():.2f}")
-    print(f"Highest Marks: {db.get_highest_marks()}")
-    print(f"Lowest Marks: {db.get_lowest_marks()}")
+    print(f"Highest Marks: {db.get_highest_marks():.2f}")
+    print(f"Lowest Marks: {db.get_lowest_marks():.2f}")
 
 
 def display_course_statistics(db):
@@ -64,33 +94,21 @@ def display_course_statistics(db):
         print("No course records available.")
         return
 
-    print("\n===== Course-wise Statistics =====")
-    print(f"{'Course':<15}{'Students':<12}{'Average':<12}{'Highest':<12}{'Lowest':<12}")
-    print("-" * 63)
+    print(
+        f"\n{'ID':<8}{'Course':<15}{'Students':<12}"
+        f"{'Average':<12}{'Highest':<12}{'Lowest':<12}"
+    )
+    print("-" * 71)
 
-    for course, total, average, highest, lowest in statistics:
+    for course_id, name, total, average, highest, lowest in statistics:
+        avg_text = f"{average:.2f}" if average is not None else "N/A"
+        high_text = f"{highest:.2f}" if highest is not None else "N/A"
+        low_text = f"{lowest:.2f}" if lowest is not None else "N/A"
+
         print(
-            f"{course:<15}{total:<12}"
-            f"{average:.2f}{'':<10}"
-            f"{highest:<12}{lowest:<12}"
+            f"{course_id:<8}{name:<15}{total:<12}"
+            f"{avg_text:<12}{high_text:<12}{low_text:<12}"
         )
-
-    try:
-        min_average = float(
-            input("\nEnter minimum average marks to filter courses (0-100): ")
-        )
-        qualifying_courses = db.get_courses_above_average(min_average)
-
-        print(f"\nCourses with average marks >= {min_average}:")
-        if not qualifying_courses:
-            print("No courses meet this average.")
-        else:
-            for course, average in qualifying_courses:
-                print(f"{course}: {average:.2f}")
-
-    except ValueError as e:
-        print(f"Validation/Input error: {e}")
-
 
 
 def main():
@@ -102,154 +120,148 @@ def main():
 
         while True:
             print("\n===== Student Management System =====")
-            
-            print("1. Add Student")
-            print("2. View All Students")
-            print("3. Search Student by ID")
-            print("4. Search Student by Course")
-            print("5. Search Student by Name")
-            print("6. Filter Students by Marks")
-            print("7. Sort Students by Marks")
-            print("8. Top N Students")
-            print("9. Update Student")
-            print("10. Delete Student")
-            print("11. Student Statistics")
-            print("12. Course-wise Statistics")
-            print("13. Exit")
+            print("1. Add Course")
+            print("2. View Courses")
+            print("3. Add Student")
+            print("4. View All Students")
+            print("5. Search Student")
+            print("6. Search Students by Course")
+            print("7. Search Students by Marks")
+            print("8. Sort Students")
+            print("9. Top N Students")
+            print("10. Update Student")
+            print("11. Delete Student")
+            print("12. Student Statistics")
+            print("13. Course-wise Statistics")
+            print("14. Courses Without Students")
+            print("15. Exit")
 
-            choice = input("Enter your choice (1-13): ").strip()
-
+            choice = input("Enter your choice (1-15): ").strip()
 
             if choice == "1":
+                try:
+                    course_id = int(input("Enter Course ID: "))
+                    course_name = input("Enter Course Name: ")
+                    course = Course(course_id, course_name)
+                    db.add_course(course)
+                except ValueError as e:
+                    print(f"Validation/Input error: {e}")
+
+            elif choice == "2":
+                display_courses(db.get_all_courses())
+
+            elif choice == "3":
                 try:
                     student_id = int(input("Enter Student ID: "))
                     name = input("Enter Name: ")
                     age = int(input("Enter Age: "))
-                    course = input("Enter Course: ")
+                    course_id = int(input("Enter Course ID: "))
                     marks = float(input("Enter Marks: "))
 
+                    if db.get_course_by_id(course_id) is None:
+                        print("Invalid course ID.")
+                        continue
+
                     student = Student(
-                        student_id, name, age, course, marks
+                        student_id, name, age, course_id, marks
                     )
                     db.add_student(student)
 
                 except ValueError as e:
                     print(f"Validation/Input error: {e}")
 
-            elif choice == "2":
-                display_students(db.get_all_students())
-
-            elif choice == "3":
-                try:
-                    student_id = int(
-                        input("Enter Student ID to search: ")
-                    )
-                    display_student(db.get_student_by_id(student_id))
-
-                except ValueError:
-                    print("Student ID must be an integer.")
-
             elif choice == "4":
-                try:
-                    course = input("Enter course to search: ")
-                    students = db.get_students_by_course(course)
-                    display_students(students)
-
-                except ValueError as e:
-                    print(f"Validation/Input error: {e}")
+                display_students_with_courses(db.get_students_with_courses())
 
             elif choice == "5":
                 try:
-                    keyword = input("Enter name or part of name: ")
-                    students = db.search_students_by_name(keyword)
-                    display_students(students)
-
-                except ValueError as e:
-                    print(f"Validation/Input error: {e}")
+                    student_id = int(input("Enter Student ID to search: "))
+                    display_student(db.get_student_by_id(student_id))
+                except ValueError:
+                    print("Student ID must be an integer.")
 
             elif choice == "6":
                 try:
-                    min_marks = float(
-                        input("Enter minimum marks (0-100): ")
-                    )
-                    students = db.get_students_by_marks(min_marks)
-                    display_students(students)
+                    course_id = int(input("Enter Course ID: "))
+                    if db.get_course_by_id(course_id) is None:
+                        print("Invalid course ID.")
+                    else:
+                        display_students(db.get_students_by_course(course_id))
+                except ValueError:
+                    print("Course ID must be an integer.")
 
+            elif choice == "7":
+                try:
+                    min_marks = float(input("Enter minimum marks (0-100): "))
+                    display_students(db.get_students_by_marks(min_marks))
                 except ValueError as e:
                     print(f"Validation/Input error: {e}")
 
-            elif choice == "7":
+            elif choice == "8":
                 print("1. Sort by marks (Descending)")
                 print("2. Sort by marks (Ascending)")
                 sort_choice = input("Choose sorting order (1-2): ").strip()
 
                 if sort_choice == "1":
-                    students = db.get_students_sorted_by_marks(desc=True)
-                    display_students(students)
+                    display_students(db.get_students_sorted_by_marks(desc=True))
                 elif sort_choice == "2":
-                    students = db.get_students_sorted_by_marks(desc=False)
-                    display_students(students)
+                    display_students(db.get_students_sorted_by_marks(desc=False))
                 else:
                     print("Invalid sorting choice.")
 
-            elif choice == "8":
-                try:
-                    limit = int(input("Enter number of top students: "))
-                    students = db.get_top_students(limit)
-                    display_students(students)
-
-                except ValueError as e:
-                    print(f"Validation/Input error: {e}")
-
             elif choice == "9":
                 try:
-                    student_id = int(
-                        input("Enter Student ID to update: ")
-                    )
-                    existing_student = db.get_student_by_id(student_id)
-
-                    if existing_student is None:
-                        print("Student not found.")
-                        continue
-
-                    print("Current student details:")
-                    display_student(existing_student)
-
-                    name = input("Enter new Name: ")
-                    age = int(input("Enter new Age: "))
-                    course = input("Enter new Course: ")
-                    marks = float(input("Enter new Marks: "))
-
-                    db.update_student(
-                        student_id, name, age, course, marks
-                    )
-
+                    limit = int(input("Enter number of top students: "))
+                    display_students(db.get_top_students(limit))
                 except ValueError as e:
                     print(f"Validation/Input error: {e}")
 
             elif choice == "10":
                 try:
-                    student_id = int(
-                        input("Enter Student ID to delete: ")
-                    )
-                    delete_student_with_confirmation(db, student_id)
+                    student_id = int(input("Enter Student ID to update: "))
+                    existing = db.get_student_by_id(student_id)
 
+                    if existing is None:
+                        print("Student not found.")
+                        continue
+
+                    print("Current student details:")
+                    display_student(existing)
+
+                    name = input("Enter new Name: ")
+                    age = int(input("Enter new Age: "))
+                    course_id = int(input("Enter new Course ID: "))
+                    marks = float(input("Enter new Marks: "))
+
+                    db.update_student(
+                        student_id, name, age, course_id, marks
+                    )
+                except ValueError as e:
+                    print(f"Validation/Input error: {e}")
+
+            elif choice == "11":
+                try:
+                    student_id = int(input("Enter Student ID to delete: "))
+                    delete_student_with_confirmation(db, student_id)
                 except ValueError:
                     print("Student ID must be an integer.")
 
-            
-            elif choice == "11":
+            elif choice == "12":
                 display_student_statistics(db)
 
-            elif choice == "12":
+            elif choice == "13":
                 display_course_statistics(db)
 
-            elif choice == "13":
+            elif choice == "14":
+                print("\n===== Courses Without Students =====")
+                display_courses(db.get_courses_without_students())
+
+            elif choice == "15":
                 print("Exiting Student Management System.")
                 break
 
             else:
-                print("Invalid choice. Please enter a number from 1 to 13.")
+                print("Invalid choice. Please enter a number from 1 to 15.")
 
     except Exception as e:
         print(f"Application error: {e}")

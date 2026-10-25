@@ -1,7 +1,10 @@
 
+
 import sqlite3
 import os
 from student import Student
+from course import Course
+
 
 class Database:
     def __init__(self, db_name="student_management.db"):
@@ -11,6 +14,7 @@ class Database:
     def connect(self):
         try:
             self.connection = sqlite3.connect(self.db_name)
+            self.connection.execute("PRAGMA foreign_keys = ON")
             print("Database connected successfully.")
             return self.connection
         except sqlite3.Error as e:
@@ -22,63 +26,117 @@ class Database:
             self.connection.close()
             self.connection = None
             print("Database connection closed.")
+    def create_course_table(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS courses (
+                course_id INTEGER PRIMARY KEY,
+                course_name TEXT NOT NULL UNIQUE
+            )
+        """)
+        self.connection.commit()
 
     def create_table(self):
         try:
             cursor = self.connection.cursor()
 
+            self.create_course_table()
+
             cursor.execute("""
-                SELECT name
-                FROM sqlite_master
+                SELECT name FROM sqlite_master
                 WHERE type = 'table' AND name = 'students'
             """)
-            table_exists = cursor.fetchone() is not None
+            exists = cursor.fetchone() is not None
 
-            if not table_exists:
+            if not exists:
                 cursor.execute("""
                     CREATE TABLE students (
                         student_id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
                         age INTEGER NOT NULL CHECK(age > 0),
-                        course TEXT NOT NULL,
+                        course_id INTEGER NOT NULL,
                         marks REAL NOT NULL
-                            CHECK(marks >= 0 AND marks <= 100)
+                            CHECK(marks >= 0 AND marks <= 100),
+                        FOREIGN KEY(course_id)
+                            REFERENCES courses(course_id)
                     )
                 """)
             else:
                 cursor.execute("PRAGMA table_info(students)")
-                columns = cursor.fetchall()
-                column_info = {column[1]: column for column in columns}
+                columns = [row[1] for row in cursor.fetchall()]
 
-                constraints_exist = (
-                    column_info.get("student_id", (None,) * 6)[5] == 1
-                    and all(
-                        column_info.get(name, (None,) * 4)[3] == 1
-                        for name in ("name", "age", "course", "marks")
-                    )
-                )
+                if "course" in columns and "course_id" not in columns:
+                    cursor.execute("""
+                        SELECT DISTINCT UPPER(TRIM(course))
+                        FROM students
+                        WHERE course IS NOT NULL
+                          AND TRIM(course) != ''
+                    """)
+                    old_courses = [
+                        row[0] for row in cursor.fetchall()
+                    ]
 
-                if not constraints_exist:
-                    cursor.execute("PRAGMA foreign_keys = OFF")
-                    cursor.execute("BEGIN")
+                    # Reuse existing course IDs where possible.
+                    cursor.execute("SELECT course_id, course_name FROM courses")
+                    existing = cursor.fetchall()
+                    course_ids = {}
+
+                    for course_id, course_name in existing:
+                        key = course_name.strip().upper()
+                        if key not in course_ids:
+                            course_ids[key] = course_id
+
+                    next_id = max(
+                        [row[0] for row in existing] or [0]
+                    ) + 1
+
+                    for course_name in old_courses:
+                        if course_name not in course_ids:
+                            while next_id in [
+                                row[0] for row in existing
+                            ]:
+                                next_id += 1
+
+                            cursor.execute("""
+                                INSERT INTO courses (course_id, course_name)
+                                VALUES (?, ?)
+                            """, (next_id, course_name))
+                            course_ids[course_name] = next_id
+                            existing.append((next_id, course_name))
+                            next_id += 1
 
                     cursor.execute("""
                         CREATE TABLE students_new (
                             student_id INTEGER PRIMARY KEY,
                             name TEXT NOT NULL,
                             age INTEGER NOT NULL CHECK(age > 0),
-                            course TEXT NOT NULL,
+                            course_id INTEGER NOT NULL,
                             marks REAL NOT NULL
-                                CHECK(marks >= 0 AND marks <= 100)
+                                CHECK(marks >= 0 AND marks <= 100),
+                            FOREIGN KEY(course_id)
+                                REFERENCES courses(course_id)
                         )
                     """)
 
-                    cursor.execute("""
-                        INSERT INTO students_new
-                            (student_id, name, age, course, marks)
-                        SELECT student_id, name, age, course, marks
-                        FROM students
-                    """)
+                    cursor.execute("SELECT * FROM students")
+                    old_students = cursor.fetchall()
+
+                    for student_id, name, age, course, marks in old_students:
+                        if course is None or not course.strip():
+                            raise ValueError(
+                                f"Student {student_id} has no course."
+                            )
+
+                        course_key = course.strip().upper()
+                        course_id = course_ids[course_key]
+
+                        cursor.execute("""
+                            INSERT INTO students_new
+                                (student_id, name, age, course_id, marks)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (
+                            student_id, name, age, course_id, marks
+                        ))
 
                     cursor.execute("DROP TABLE students")
                     cursor.execute(
@@ -86,139 +144,269 @@ class Database:
                     )
 
             self.connection.commit()
-            print("Students table created successfully.")
+            print("Courses and students tables created successfully.")
 
-        except sqlite3.Error as e:
+        except (sqlite3.Error, ValueError) as e:
             self.connection.rollback()
             print(f"Table creation error: {e}")
             raise
 
-    def add_student(self, student):
+    # Course operations
+
+    def add_course(self, course):
+        if not isinstance(course, Course):
+            raise TypeError("Expected a Course object.")
+
         try:
-            cursor = self.connection.cursor()
-
-            cursor.execute("""
-                INSERT INTO students (student_id, name, age, course, marks)
-                VALUES (?, ?, ?, ?, ?)
+            self.connection.execute("""
+                INSERT INTO courses (course_id, course_name)
+                VALUES (?, ?)
             """, (
-                student.student_id,
-                student.name,
-                student.age,
-                student.course,
-                student.marks
+                course.course_id,
+                course.course_name.strip().upper()
             ))
-
             self.connection.commit()
-            print("Student added successfully.")
-
+            print("Course added successfully.")
+            return True
         except sqlite3.IntegrityError as e:
             self.connection.rollback()
+            print(f"Course insertion failed: {e}")
+            return False
 
-            if "UNIQUE constraint failed" in str(e) or \
-                    "PRIMARY KEY" in str(e):
-                print("Student ID already exists.")
-            else:
-                print(f"Student data violates database constraints: {e}")
+    def get_all_courses(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course_id, course_name
+            FROM courses ORDER BY course_id
+        """)
+        return cursor.fetchall()
 
-        except sqlite3.Error as e:
-            self.connection.rollback()
-            print(f"Student insertion error: {e}")
-            raise
+    def get_course_by_id(self, course_id):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT course_id, course_name
+            FROM courses WHERE course_id = ?
+        """, (course_id,))
+        return cursor.fetchone()
 
-    def get_all_students(self):
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("SELECT * FROM students")
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Data retrieval error: {e}")
-            raise
-
-    def get_student_by_id(self, student_id):
+    def delete_course(self, course_id):
         try:
             cursor = self.connection.cursor()
             cursor.execute(
-                "SELECT * FROM students WHERE student_id = ?",
-                (student_id,)
+                "DELETE FROM courses WHERE course_id = ?",
+                (course_id,)
             )
-            return cursor.fetchone()
-        except sqlite3.Error as e:
-            print(f"Student search error: {e}")
-            raise
+            self.connection.commit()
 
-        
-    def update_student(self, student_id, name, age, course, marks):
+            if cursor.rowcount:
+                print("Course deleted successfully.")
+                return True
+
+            print("Course not found.")
+            return False
+        except sqlite3.IntegrityError:
+            self.connection.rollback()
+            print("Cannot delete a course that has students enrolled.")
+            return False
+
+    # Student CRUD
+
+    def add_student(self, student):
+        if not isinstance(student, Student):
+            raise TypeError("Expected a Student object.")
+
+        if self.get_course_by_id(student.course_id) is None:
+            print("Invalid course ID.")
+            return False
+
         try:
-            student = Student(student_id, name, age, course, marks)
+            self.connection.execute("""
+                INSERT INTO students
+                    (student_id, name, age, course_id, marks)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                student.student_id,
+                student.name.strip(),
+                student.age,
+                student.course_id,
+                student.marks
+            ))
+            self.connection.commit()
+            print("Student added successfully.")
+            return True
+        except sqlite3.IntegrityError as e:
+            self.connection.rollback()
+            print(f"Student insertion failed: {e}")
+            return False
 
+    def get_all_students(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT student_id, name, age, course_id, marks
+            FROM students ORDER BY student_id
+        """)
+        return cursor.fetchall()
+
+    def get_student_by_id(self, student_id):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT student_id, name, age, course_id, marks
+            FROM students WHERE student_id = ?
+        """, (student_id,))
+        return cursor.fetchone()
+
+    def update_student(self, student_id, name, age, course_id, marks):
+        student = Student(student_id, name, age, course_id, marks)
+
+        if self.get_course_by_id(course_id) is None:
+            print("Invalid course ID.")
+            return 0
+
+        try:
             cursor = self.connection.cursor()
             cursor.execute("""
                 UPDATE students
-                SET name = ?, age = ?, course = ?, marks = ?
+                SET name = ?, age = ?, course_id = ?, marks = ?
                 WHERE student_id = ?
             """, (
-                student.name,
-                student.age,
-                student.course,
-                student.marks,
-                student_id
+                student.name.strip(), student.age,
+                student.course_id, student.marks, student_id
             ))
-
             self.connection.commit()
 
-            if cursor.rowcount == 1:
+            if cursor.rowcount:
                 print("Student updated successfully.")
             else:
                 print("Student not found.")
 
             return cursor.rowcount
-
-        except sqlite3.IntegrityError as e:
-            self.connection.rollback()
-            print(f"Student update failed: {e}")
-            return 0
-
         except sqlite3.Error as e:
             self.connection.rollback()
             print(f"Student update error: {e}")
             raise
 
     def delete_student(self, student_id):
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "DELETE FROM students WHERE student_id = ?",
-                (student_id,)
-            )
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "DELETE FROM students WHERE student_id = ?",
+            (student_id,)
+        )
+        self.connection.commit()
 
-            self.connection.commit()
+        if cursor.rowcount:
+            print("Student deleted successfully.")
+        else:
+            print("Student not found.")
 
-            if cursor.rowcount == 1:
-                print("Student deleted successfully.")
-            else:
-                print("Student not found.")
+        return cursor.rowcount
 
-            return cursor.rowcount
+    # JOIN operations
 
-        except sqlite3.Error as e:
-            self.connection.rollback()
-            print(f"Student deletion error: {e}")
-            raise
-    def get_students_by_course(self, course):
-        if not isinstance(course, str) or not course.strip():
-            raise ValueError("Course cannot be empty.")
+    def get_students_with_courses(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT s.student_id, s.name, s.age,
+                   c.course_id, c.course_name, s.marks
+            FROM students AS s
+            INNER JOIN courses AS c
+                ON s.course_id = c.course_id
+            ORDER BY s.student_id
+        """)
+        return cursor.fetchall()
 
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "SELECT * FROM students WHERE course = ?",
-                (course.strip(),)
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Course filtering error: {e}")
-            raise
+    def get_course_statistics(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT c.course_id, c.course_name,
+                   COUNT(s.student_id),
+                   AVG(s.marks), MAX(s.marks), MIN(s.marks)
+            FROM courses AS c
+            LEFT JOIN students AS s
+                ON c.course_id = s.course_id
+            GROUP BY c.course_id, c.course_name
+            ORDER BY c.course_id
+        """)
+        return cursor.fetchall()
 
+    def get_courses_without_students(self):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT c.course_id, c.course_name
+            FROM courses AS c
+            LEFT JOIN students AS s
+                ON c.course_id = s.course_id
+            WHERE s.student_id IS NULL
+            ORDER BY c.course_id
+        """)
+        return cursor.fetchall()
+
+    # Student and marks searches
+
+    def get_students_by_course(self, course_id):
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT student_id, name, age, course_id, marks
+            FROM students WHERE course_id = ?
+            ORDER BY student_id
+        """, (course_id,))
+        return cursor.fetchall()
+
+    def get_students_by_marks(self, min_marks):
+        if (
+            not isinstance(min_marks, (int, float))
+            or isinstance(min_marks, bool)
+            or not 0 <= min_marks <= 100
+        ):
+            raise ValueError("Invalid marks.")
+
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT student_id, name, age, course_id, marks
+            FROM students WHERE marks >= ?
+            ORDER BY marks DESC
+        """, (min_marks,))
+        return cursor.fetchall()
+
+    def search_students_by_name(self, keyword):
+        if not isinstance(keyword, str) or not keyword.strip():
+            raise ValueError("Search keyword cannot be empty.")
+
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT student_id, name, age, course_id, marks
+            FROM students WHERE name LIKE ?
+            ORDER BY student_id
+        """, (f"%{keyword.strip()}%",))
+        return cursor.fetchall()
+
+    def get_students_sorted_by_marks(self, desc=True):
+        if not isinstance(desc, bool):
+            raise ValueError("Sort order must be True or False.")
+
+        order = "DESC" if desc else "ASC"
+        cursor = self.connection.cursor()
+        cursor.execute(f"""
+            SELECT student_id, name, age, course_id, marks
+            FROM students ORDER BY marks {order}
+        """)
+        return cursor.fetchall()
+
+    def get_top_students(self, limit):
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or limit <= 0
+        ):
+            raise ValueError("Number of students must be greater than 0.")
+
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT student_id, name, age, course_id, marks
+            FROM students ORDER BY marks DESC LIMIT ?
+        """, (limit,))
+        return cursor.fetchall()
+
+    # Overall statistics
 
     def get_total_students(self):
         cursor = self.connection.cursor()
@@ -245,42 +433,36 @@ class Database:
         cursor.execute("SELECT MIN(marks) FROM students")
         return cursor.fetchone()[0]
 
-    def get_course_statistics(self):
-        cursor = self.connection.cursor()
-        cursor.execute("""
-            SELECT course, COUNT(*) AS total_students,
-                   AVG(marks) AS average_marks,
-                   MAX(marks) AS highest_marks,
-                   MIN(marks) AS lowest_marks
-            FROM students
-            GROUP BY course
-        """)
-        return cursor.fetchall()
-
     def get_course_average_marks(self):
         cursor = self.connection.cursor()
         cursor.execute("""
-            SELECT course, AVG(marks) AS average_marks
-            FROM students
-            GROUP BY course
+            SELECT c.course_name, AVG(s.marks)
+            FROM courses AS c
+            LEFT JOIN students AS s ON c.course_id = s.course_id
+            GROUP BY c.course_id, c.course_name
+            ORDER BY c.course_id
         """)
         return cursor.fetchall()
 
     def get_course_highest_marks(self):
         cursor = self.connection.cursor()
         cursor.execute("""
-            SELECT course, MAX(marks) AS highest_marks
-            FROM students
-            GROUP BY course
+            SELECT c.course_name, MAX(s.marks)
+            FROM courses AS c
+            LEFT JOIN students AS s ON c.course_id = s.course_id
+            GROUP BY c.course_id, c.course_name
+            ORDER BY c.course_id
         """)
         return cursor.fetchall()
 
     def get_course_lowest_marks(self):
         cursor = self.connection.cursor()
         cursor.execute("""
-            SELECT course, MIN(marks) AS lowest_marks
-            FROM students
-            GROUP BY course
+            SELECT c.course_name, MIN(s.marks)
+            FROM courses AS c
+            LEFT JOIN students AS s ON c.course_id = s.course_id
+            GROUP BY c.course_id, c.course_name
+            ORDER BY c.course_id
         """)
         return cursor.fetchall()
 
@@ -294,127 +476,11 @@ class Database:
 
         cursor = self.connection.cursor()
         cursor.execute("""
-            SELECT course, AVG(marks) AS average_marks
-            FROM students
-            GROUP BY course
-            HAVING AVG(marks) >= ?
+            SELECT c.course_name, AVG(s.marks)
+            FROM courses AS c
+            INNER JOIN students AS s ON c.course_id = s.course_id
+            GROUP BY c.course_id, c.course_name
+            HAVING AVG(s.marks) >= ?
         """, (min_average,))
         return cursor.fetchall()
 
-    def get_students_by_marks(self, min_marks):
-        if (
-            not isinstance(min_marks, (int, float))
-            or isinstance(min_marks, bool)
-            or not 0 <= min_marks <= 100
-        ):
-            raise ValueError("Invalid marks.")
-
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "SELECT * FROM students WHERE marks >= ?",
-                (min_marks,)
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Marks filtering error: {e}")
-            raise
-
-    def search_students_by_name(self, keyword):
-        if not isinstance(keyword, str) or not keyword.strip():
-            raise ValueError("Search keyword cannot be empty.")
-
-        try:
-            keyword = f"%{keyword.strip()}%"
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "SELECT * FROM students WHERE name LIKE ?",
-                (keyword,)
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Name search error: {e}")
-            raise
-
-    def get_students_sorted_by_marks(self, desc=True):
-        if not isinstance(desc, bool):
-            raise ValueError("Sort order must be True or False.")
-
-        order = "DESC" if desc else "ASC"
-
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                f"SELECT * FROM students ORDER BY marks {order}"
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Student sorting error: {e}")
-            raise
-
-    def get_top_students(self, limit):
-        if (
-            not isinstance(limit, int)
-            or isinstance(limit, bool)
-            or limit <= 0
-        ):
-            raise ValueError("Number of students must be greater than 0.")
-
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                "SELECT * FROM students ORDER BY marks DESC LIMIT ?",
-                (limit,)
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Top students retrieval error: {e}")
-            raise
-
-
-        
-    def get_students_by_course_and_marks(self, course, min_marks):
-        if not isinstance(course, str) or not course.strip():
-            raise ValueError("Course cannot be empty.")
-
-        if (
-            not isinstance(min_marks, (int, float))
-            or isinstance(min_marks, bool)
-            or not 0 <= min_marks <= 100
-        ):
-            raise ValueError("Invalid marks.")
-
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                """
-                SELECT * FROM students
-                WHERE course = ? AND marks >= ?
-                """,
-                (course.strip(), min_marks)
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Course and marks filtering error: {e}")
-            raise
-
-    def get_students_by_courses(self, course1, course2):
-        if (
-            not isinstance(course1, str) or not course1.strip()
-            or not isinstance(course2, str) or not course2.strip()
-        ):
-            raise ValueError("Course cannot be empty.")
-
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(
-                """
-                SELECT * FROM students
-                WHERE course = ? OR course = ?
-                """,
-                (course1.strip(), course2.strip())
-            )
-            return cursor.fetchall()
-        except sqlite3.Error as e:
-            print(f"Multiple-course filtering error: {e}")
-            raise
